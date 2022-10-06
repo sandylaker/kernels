@@ -1,5 +1,7 @@
 use ndarray::{Array2, ArrayBase, Axis, Data, Ix2, Zip};
 use num_traits::Float;
+use numpy::{IntoPyArray, PyArray2, PyReadonlyArray2};
+use pyo3::prelude::*;
 
 pub fn chi2_kernel<S, A>(x: &ArrayBase<S, Ix2>, y: &ArrayBase<S, Ix2>, gamma: A) -> Array2<A>
 where
@@ -13,7 +15,7 @@ where
     Zip::from(result.rows_mut())
         .and(x.rows())
         .par_for_each(|result_row, x_single| {
-            // for a fix single x sample, compute the chi2 value between the x sample and each y sample.
+            // for a fix single x sample, iterate through all the y samples.
             Zip::from(result_row)
                 .and(y.rows())
                 .par_for_each(|result_single, y_single| {
@@ -37,6 +39,20 @@ where
         });
 
     result
+}
+
+#[pyfunction(name = "chi2_kernel")]
+pub fn chi2_kernel_py<'py>(
+    py: Python<'py>,
+    x: PyReadonlyArray2<f64>,
+    y: PyReadonlyArray2<f64>,
+    gamma: f64,
+) -> &'py PyArray2<f64> {
+    let x = x.as_array();
+    let y = y.as_array();
+    let result = chi2_kernel(&x, &y, gamma);
+    let result = Array2::from(result);
+    result.into_pyarray(py)
 }
 
 #[cfg(test)]
