@@ -1,3 +1,4 @@
+extern crate openblas_src;
 use ndarray::{Array2, ArrayBase, Axis, Data, Ix2, Zip};
 use num_traits::Float;
 use numpy::{IntoPyArray, PyArray2, PyReadonlyArray2};
