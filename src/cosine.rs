@@ -1,5 +1,5 @@
 extern crate openblas_src;
-use ndarray::{Array2, ArrayBase, Axis, Data, Ix2, Zip};
+use ndarray::{Array2, ArrayBase, Axis, Data, Ix2};
 use num_traits::Float;
 use numpy::{IntoPyArray, PyArray2, PyReadonlyArray2};
 use pyo3::prelude::*;
@@ -7,30 +7,19 @@ use pyo3::prelude::*;
 pub fn cosine_kernel<S, A: 'static>(x: &ArrayBase<S, Ix2>, y: &ArrayBase<S, Ix2>) -> Array2<A>
 where
     S: Data<Elem = A> + Send + Sync,
-    A: Float + Sync + Send,
+    A: Float + Send + Sync + Clone,
 {
-    let num_x_samples = x.len_of(Axis(0));
-    let num_y_samples = y.len_of(Axis(0));
-    let mut result: Array2<A> = Array2::zeros((num_x_samples, num_y_samples));
+    let x_sq_mat: Array2<A> = x.dot(&x.t());
+    let mut x_norm = x_sq_mat.diag().insert_axis(Axis(1)).into_owned();
+    x_norm.par_mapv_inplace(|z| z.sqrt());
+    let x_normed = x / x_norm;
 
-    Zip::from(result.rows_mut())
-        .and(x.rows())
-        .par_for_each(|result_row, x_single| {
-            // for a fix single x sample, iterate through all the y samples.
-            Zip::from(result_row)
-                .and(y.rows())
-                .par_for_each(|result_single, y_single| {
-                    // for a fix single x sample and a single y sample, compute the chi2 value, and assign it to the
-                    // corresponding entry in the result matrix.
-                    let inner = x_single.dot(&y_single);
-                    let x_norm = (x_single.dot(&x_single)).sqrt();
-                    let y_norm = (y_single.dot(&y_single)).sqrt();
+    let y_sq_mat: Array2<A> = y.dot(&y.t());
+    let mut y_norm = y_sq_mat.diag().insert_axis(Axis(1)).into_owned();
+    y_norm.par_mapv_inplace(|z| z.sqrt());
+    let y_normed = y / y_norm;
 
-                    *result_single = inner / (x_norm * y_norm);
-                })
-        });
-
-    result
+    x_normed.dot(&y_normed.t())
 }
 
 #[pyfunction(name = "cosine_kernel")]
@@ -49,7 +38,7 @@ pub fn cosine_kernel_py<'py>(
 mod tests {
     use super::cosine_kernel;
     use approx::assert_abs_diff_eq;
-    use ndarray::{array, Array, Array1, Array2};
+    use ndarray::{array, Array, Array2};
 
     #[test]
     fn test_cosine_kernel() {
