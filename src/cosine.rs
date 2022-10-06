@@ -4,9 +4,9 @@ use numpy::{IntoPyArray, PyArray2, PyReadonlyArray2};
 use pyo3::prelude::*;
 
 pub fn cosine_kernel<S, A>(x: &ArrayBase<S, Ix2>, y: &ArrayBase<S, Ix2>) -> Array2<A>
-    where
-        S: Data<Elem = A> + Send + Sync,
-        A: Float + Sync + Send,
+where
+    S: Data<Elem = A> + Send + Sync,
+    A: Float + Sync + Send,
 {
     let num_x_samples = x.len_of(Axis(0));
     let num_y_samples = y.len_of(Axis(0));
@@ -49,7 +49,6 @@ pub fn cosine_kernel<S, A>(x: &ArrayBase<S, Ix2>, y: &ArrayBase<S, Ix2>) -> Arra
 
     result
 }
-
 
 #[pyfunction(name = "cosine_kernel")]
 pub fn cosine_kernel_py<'py>(
