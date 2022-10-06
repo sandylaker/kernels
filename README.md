@@ -1,4 +1,4 @@
-# Rust implementations of different kernel methods
+# A Rust implementation of different kernel methods
 
 ## Speed Benchmark
 
@@ -6,7 +6,7 @@ Remark:
 * The Rust version is optimized at `O3` level. The speed is measured using the `%%timeit` magic 
 command in Jupyter Notebook.
 * I also tried to extract the two outer for-loops into a separate function. But it proved to slow
-down the speed.
+down computation.
 * Machine: 4 x Intel(R) Xeon(R) CPU @ 2.20GHz, 16GB RAM
 * Input: `x = numpy.random.rand(500, 128)`, and `y = numpy.random.rand(400, 128)`. 
 
