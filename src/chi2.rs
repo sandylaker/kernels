@@ -1,45 +1,42 @@
-use super::pairwise_kernel::pairwise_kernel;
-use ndarray::{Array2, ArrayBase, ArrayView1, Data, Ix2, Zip};
+use ndarray::{Array2, ArrayBase, Axis, Data, Ix2, Zip};
 use num_traits::Float;
-use numpy::{IntoPyArray, PyArray2, PyReadonlyArray2};
-use pyo3::prelude::*;
 
 pub fn chi2_kernel<S, A>(x: &ArrayBase<S, Ix2>, y: &ArrayBase<S, Ix2>, gamma: A) -> Array2<A>
 where
     S: Data<Elem = A> + Send + Sync,
     A: Float + Sync + Send,
 {
-    let chi2_pairwise_fn = |x_single: ArrayView1<A>, y_single: ArrayView1<A>| {
-        let kernel_element = Zip::from(x_single).and(y_single).par_fold(
-            || A::zero(),
-            |acc, x_feat, y_feat| {
-                let denom: A = *x_feat - *y_feat;
-                let nom: A = *x_feat + *y_feat;
-                if !nom.is_zero() {
-                    return acc + (denom * denom) / nom;
-                }
-                acc
-            },
-            |acc, other_acc| acc + other_acc,
-        );
-        let tmp: A = -gamma * kernel_element;
-        tmp.exp()
-    };
+    let num_x_samples = x.len_of(Axis(0));
+    let num_y_samples = y.len_of(Axis(0));
+    let mut result: Array2<A> = Array2::zeros((num_x_samples, num_y_samples));
 
-    pairwise_kernel(x, y, chi2_pairwise_fn)
-}
+    Zip::from(result.rows_mut())
+        .and(x.rows())
+        .par_for_each(|result_row, x_single| {
+            // for a fix single x sample, compute the chi2 value between the x sample and each y sample.
+            Zip::from(result_row)
+                .and(y.rows())
+                .par_for_each(|result_single, y_single| {
+                    // for a fix single x sample and a single y sample, compute the chi2 value, and assign it to the
+                    // corresponding entry in the result matrix.
+                    let kernel_element = Zip::from(x_single).and(y_single).par_fold(
+                        || A::zero(),
+                        |acc, x_feat, y_feat| {
+                            let denom: A = *x_feat - *y_feat;
+                            let nom: A = *x_feat + *y_feat;
+                            if !nom.is_zero() {
+                                return acc + (denom * denom) / nom;
+                            }
+                            acc
+                        },
+                        |acc, other_acc| acc + other_acc,
+                    );
+                    let tmp: A = -gamma * kernel_element;
+                    *result_single = tmp.exp();
+                })
+        });
 
-#[pyfunction(name = "chi2_kernel")]
-pub fn chi2_kernel_py<'py>(
-    py: Python<'py>,
-    x: PyReadonlyArray2<f64>,
-    y: PyReadonlyArray2<f64>,
-    gamma: f64,
-) -> &'py PyArray2<f64> {
-    let x = x.as_array();
-    let y = y.as_array();
-    let result = chi2_kernel(&x, &y, gamma);
-    result.into_pyarray(py)
+    result
 }
 
 #[cfg(test)]
