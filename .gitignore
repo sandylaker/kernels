@@ -5,3 +5,5 @@ __pycache__/
 *.so
 *.egg-info
 .idea/
+rsync_exclude.txt
+.DS_Store

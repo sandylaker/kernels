@@ -3,7 +3,7 @@ use num_traits::Float;
 use numpy::{IntoPyArray, PyArray2, PyReadonlyArray2};
 use pyo3::prelude::*;
 
-pub fn cosine_kernel<S, A>(x: &ArrayBase<S, Ix2>, y: &ArrayBase<S, Ix2>) -> Array2<A>
+pub fn cosine_kernel<S, A: 'static>(x: &ArrayBase<S, Ix2>, y: &ArrayBase<S, Ix2>) -> Array2<A>
 where
     S: Data<Elem = A> + Send + Sync,
     A: Float + Sync + Send,
@@ -21,27 +21,9 @@ where
                 .par_for_each(|result_single, y_single| {
                     // for a fix single x sample and a single y sample, compute the chi2 value, and assign it to the
                     // corresponding entry in the result matrix.
-                    let (inner, x_sq, y_sq) = Zip::from(x_single).and(y_single).par_fold(
-                        || (A::zero(), A::zero(), A::zero()),
-                        |acc, x_feat, y_feat| {
-                            let (mut acc_inner, mut acc_x_sq, mut acc_y_sq) = acc;
-                            acc_inner = acc_inner + *x_feat * (*y_feat);
-                            acc_x_sq = acc_x_sq + *x_feat * (*x_feat);
-                            acc_y_sq = acc_y_sq + *y_feat * (*y_feat);
-                            return (acc_inner, acc_x_sq, acc_y_sq);
-                        },
-                        |acc, other_acc| {
-                            let (mut acc_inner, mut acc_x_sq, mut acc_y_sq) = acc;
-                            let (other_acc_inner, other_acc_x_sq, other_acc_y_sq) = other_acc;
-                            acc_inner = acc_inner + other_acc_inner;
-                            acc_x_sq = acc_x_sq + other_acc_x_sq;
-                            acc_y_sq = acc_y_sq + other_acc_y_sq;
-                            return (acc_inner, acc_x_sq, acc_y_sq);
-                        },
-                    );
-
-                    let x_norm = x_sq.sqrt() + A::from(1e-8 as f64).unwrap();
-                    let y_norm = y_sq.sqrt() + A::from(1e-8 as f64).unwrap();
+                    let inner = x_single.dot(&y_single);
+                    let x_norm = (x_single.dot(&x_single)).sqrt();
+                    let y_norm = (y_single.dot(&y_single)).sqrt();
 
                     *result_single = inner / (x_norm * y_norm);
                 })
@@ -66,7 +48,7 @@ pub fn cosine_kernel_py<'py>(
 mod tests {
     use super::cosine_kernel;
     use approx::assert_abs_diff_eq;
-    use ndarray::{array, Array, Array2};
+    use ndarray::{array, Array, Array1, Array2};
 
     #[test]
     fn test_cosine_kernel() {
