@@ -15,5 +15,5 @@ down computation.
 | chi2        | **30 ms +/- 345 us**   | 115 ms +/- 4.18 ms              | 301 ms +/- 1.85 ms |
 | cosine      | 6.18 ms +/- 27.8 us    | **2.38 ms +/- 83.9 us**         | -                  |
 | polynomial  | **4.2 ms +/- 48.3 us** | 13.6 ms +/- 52.5 us             | -                  |
-
+| rbf         | 12.3 ms +/- 145 us     | **9.41 ms +/- 638 us**          | -                  |
 
