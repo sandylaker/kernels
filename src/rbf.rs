@@ -42,7 +42,7 @@ pub fn rbf_kernel_py<'py>(
 
 #[cfg(test)]
 mod tests {
-    use crate::rbf::rbf_kernel;
+    use super::rbf_kernel;
     use ::approx::assert_abs_diff_eq;
     use ndarray::{array, Array, Array2};
 
