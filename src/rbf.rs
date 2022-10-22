@@ -1,6 +1,6 @@
 extern crate openblas_src;
 
-use ndarray::{Array2, ArrayBase, Axis, Data, Ix2, Zip};
+use ndarray::{Array2, ArrayBase, Axis, Data, Ix2, ScalarOperand};
 use num_traits::Float;
 use numpy::{IntoPyArray, PyArray2, PyReadonlyArray2};
 use pyo3::prelude::*;
@@ -8,21 +8,18 @@ use pyo3::prelude::*;
 pub fn rbf_kernel<S, A>(x: &ArrayBase<S, Ix2>, y: &ArrayBase<S, Ix2>, gamma: A) -> Array2<A>
 where
     S: Data<Elem = A> + Send + Sync,
-    A: Float + Send + Sync + Clone + 'static,
+    A: Float + Send + Sync + Clone + ScalarOperand + 'static,
 {
-    let mut result = Array2::zeros((x.len_of(Axis(0)), y.len_of(Axis(0))));
-    Zip::from(result.rows_mut())
-        .and(x.rows())
-        .par_for_each(|result_row, x_single| {
-            // for a fixed single x sample
-            Zip::from(result_row)
-                .and(y.rows())
-                .par_for_each(|result_single, y_single| {
-                    let diff = &x_single - &y_single;
-                    let diff_square = diff.dot(&diff);
-                    *result_single = (-gamma * diff_square).exp();
-                })
-        });
+    // assume x has shape: (N, D) and y has shape (M, D),
+    // then x_square has shape: (N, 1), and y_quare has shape (1, M),
+    // x_y_dot has shape (N, M)
+    let x_square = x.dot(&x.t()).diag().insert_axis(Axis(1)).into_owned();
+    let y_square = y.dot(&y.t()).diag().insert_axis(Axis(0)).into_owned();
+    let x_y_dot = x.dot(&y.t());
+    // for each x_single and y_single sample pair,
+    // it computes dot(x_single, x_single) - 2 * dot(x_single, y_single) + dot(y_single, y_single)
+    let mut result = x_square - (x_y_dot * A::from::<f64>(2.0).unwrap()) + y_square;
+    result.par_mapv_inplace(|x| (-gamma * x).exp());
 
     result
 }
